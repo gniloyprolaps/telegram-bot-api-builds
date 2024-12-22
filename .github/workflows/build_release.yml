@@ -19,47 +19,51 @@ jobs:
       - name: установка зависимостей
         run: |
           sudo apt update
-          sudo apt install -y gperf zip libssl-dev zlib1g-dev g++ cmake
- 
+          sudo apt install -y gperf g++ cmake wget build-essential
+
+      - name: загрузка и установка зип-библиотеки (zlib)
+        run: |
+          wget https://zlib.net/current/zlib.tar.gz
+          tar -xvf zlib.tar.gz
+          cd zlib
+          ./configure --static --disable-shared --pkg-config-flags="--static"
+          make
+          sudo make install
+          cd ..
+
+      - name: загрузка и установка OpenSSL
+        run: |
+          # Получаем ссылку на последний релиз OpenSSL
+          OPENSSL_VERSION=$(curl -s https://api.github.com/repos/openssl/openssl/releases/latest | jq -r .tag_name)
+          echo "Загрузка OpenSSL версии $OPENSSL_VERSION"
+          
+          # Скачиваем последнюю версию OpenSSL
+          wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/openssl-${OPENSSL_VERSION#v}.tar.gz
+          tar -xvf openssl-${OPENSSL_VERSION#v}.tar.gz
+          cd openssl-${OPENSSL_VERSION#v}
+          
+          # Собираем OpenSSL как статическую библиотеку
+          ./config no-shared --prefix=/usr/local/openssl
+          make
+          sudo make install
+          cd ..
+
       - name: клонирование репо и сборка бинарника
         run: |
           git clone --recursive https://github.com/tdlib/telegram-bot-api.git
           cd telegram-bot-api
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_FLAGS="-static" -DCMAKE_EXE_LINKER_FLAGS="-static" ..
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_SHARED_LIBS=OFF \
+                -DOPENSSL_ROOT_DIR=/usr/local/openssl \
+                -DOPENSSL_LIBRARIES=/usr/local/openssl/lib \
+                -DZLIB_ROOT=/usr/local \
+                -DCMAKE_CXX_FLAGS="-static" \
+                -DCMAKE_EXE_LINKER_FLAGS="-static" ..
           cmake --build . --target install
-          chmod +x /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api
-          /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api --version > /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt 2>&1
-          sed -i 's/^.* /v/' /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt
 
-      - name: получение версии
+      - name: проверка скомпилированного бинарника
         run: |
-          echo "VERSION=$(cat /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt)" >> $GITHUB_ENV
-
-      - name: проверка требуется ли релиз
-        id: check_release
-        run: |
-          VERSION=$(cat /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          TAG_EXISTS=$(git tag -l "$VERSION")
-          if [ -z "$TAG_EXISTS" ]; then
-            echo "CREATE_RELEASE=true" >> $GITHUB_ENV
-          else
-            echo "CREATE_RELEASE=false" >> $GITHUB_ENV
-          fi
-
-      - name: создание релиза
-        if: env.CREATE_RELEASE == 'true'
-        run: |
-          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
-            -d '{"tag_name": "'"$VERSION"'", "name": "'"$VERSION"'", "body": "'"$VERSION"'", "draft": false, "prerelease": false}' \
-            "https://api.github.com/repos/${{ github.repository }}/releases"
-
-      - name: выгрузка бинарника в релиз
-        if: env.CREATE_RELEASE == 'true'
-        run: |
-          set +e
-          RELEASE_ID=$(curl -sH "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$VERSION | jq -r .id)
-          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$(basename /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api)"
-          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/octet-stream" --data-binary @"/home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api" "$UPLOAD_URL"
+          cd telegram-bot-api/build
+          ldd ./telegram-bot-api || true
