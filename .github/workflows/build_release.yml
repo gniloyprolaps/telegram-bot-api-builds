@@ -36,16 +36,11 @@ jobs:
 
       - name: загрузка и установка OpenSSL
         run: |
-          # Получаем ссылку на последний релиз OpenSSL
           OPENSSL_VERSION=$(curl -s https://api.github.com/repos/openssl/openssl/releases/latest | jq -r .tag_name)
-          echo "Загрузка OpenSSL версии $OPENSSL_VERSION"
-          
-          # Скачиваем последнюю версию OpenSSL
+          echo "загрузка OpenSSL версии $OPENSSL_VERSION"
           wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/${OPENSSL_VERSION#v}.tar.gz
-          tar -xvf openssl-${OPENSSL_VERSION#v}.tar.gz
+          tar -xvf ${OPENSSL_VERSION#v}.tar.gz
           cd openssl-${OPENSSL_VERSION#v}
-          
-          # Собираем OpenSSL как статическую библиотеку
           ./config no-shared --prefix=/usr/local/openssl
           make
           sudo make install
