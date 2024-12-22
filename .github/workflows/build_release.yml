@@ -1,0 +1,65 @@
+name: сборка и релиз
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: проверка кода
+        uses: actions/checkout@v4
+
+      - name: установка зависимостей
+        run: |
+          sudo apt update
+          sudo apt install -y gperf zip libssl-dev zlib1g-dev g++ cmake
+ 
+      - name: клонирование репо и сборка бинарника
+        run: |
+          git clone --recursive https://github.com/tdlib/telegram-bot-api.git
+          cd telegram-bot-api
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build . --target install
+          chmod +x ./telegram-bot-api/build/telegram-bot-api
+          ./telegram-bot-api/build/telegram-bot-api --version > ./telegram-bot-api/build/version_output.txt 2>&1
+          sed -i 's/^.* /v/' ./telegram-bot-api/build/version_output.txt
+
+      - name: получение версии
+        run: |
+          echo "VERSION=$(cat ./telegram-bot-api/build/version_output.txt)" >> $GITHUB_ENV
+
+      - name: проверка требуется ли релиз
+        id: check_release
+        run: |
+          VERSION=$(cat ./telegram-bot-api/build/version_output.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          TAG_EXISTS=$(git tag -l "$VERSION")
+          if [ -z "$TAG_EXISTS" ]; then
+            echo "CREATE_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "CREATE_RELEASE=false" >> $GITHUB_ENV
+          fi
+
+      - name: создание релиза
+        if: env.CREATE_RELEASE == 'true'
+        run: |
+          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+            -d '{"tag_name": "'"$VERSION"'", "name": "'"$VERSION"'", "body": "'"$VERSION"'", "draft": false, "prerelease": false}' \
+            "https://api.github.com/repos/${{ github.repository }}/releases"
+
+      - name: выгрузка бинарника в релиз
+        if: env.CREATE_RELEASE == 'true'
+        run: |
+          set +e
+          RELEASE_ID=$(curl -sH "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$VERSION | jq -r .id)
+          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$(basename ./telegram-bot-api/build/telegram-bot-api)"
+          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/octet-stream" --data-binary @"./telegram-bot-api/build/telegram-bot-api" "$UPLOAD_URL"
