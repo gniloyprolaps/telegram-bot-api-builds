@@ -41,7 +41,7 @@ jobs:
           echo "Загрузка OpenSSL версии $OPENSSL_VERSION"
           
           # Скачиваем последнюю версию OpenSSL
-          wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/openssl-${OPENSSL_VERSION#v}.tar.gz
+          wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/${OPENSSL_VERSION#v}.tar.gz
           tar -xvf openssl-${OPENSSL_VERSION#v}.tar.gz
           cd openssl-${OPENSSL_VERSION#v}
           
