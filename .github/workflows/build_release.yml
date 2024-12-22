@@ -60,8 +60,42 @@ jobs:
                 -DCMAKE_CXX_FLAGS="-static" \
                 -DCMAKE_EXE_LINKER_FLAGS="-static" ..
           cmake --build . --target install
+          chmod +x /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api
+          /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api --version > /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt 2>&1
+          sed -i 's/^.* /v/' /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt
 
       - name: проверка скомпилированного бинарника
         run: |
-          cd telegram-bot-api/build
-          ldd ./telegram-bot-api || true
+          du /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api
+          ldd /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api || true
+
+      - name: получение версии
+        run: |
+          echo "VERSION=$(cat /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt)" >> $GITHUB_ENV
+
+      - name: проверка требуется ли релиз
+        id: check_release
+        run: |
+          VERSION=$(cat /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          TAG_EXISTS=$(git tag -l "$VERSION")
+          if [ -z "$TAG_EXISTS" ]; then
+            echo "CREATE_RELEASE=true" >> $GITHUB_ENV
+          else
+            echo "CREATE_RELEASE=false" >> $GITHUB_ENV
+          fi
+
+      - name: создание релиза
+        if: env.CREATE_RELEASE == 'true'
+        run: |
+          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/json" \
+            -d '{"tag_name": "'"$VERSION"'", "name": "'"$VERSION"'", "body": "'"$VERSION"'", "draft": false, "prerelease": false}' \
+            "https://api.github.com/repos/${{ github.repository }}/releases"
+
+      - name: выгрузка бинарника в релиз
+        if: env.CREATE_RELEASE == 'true'
+        run: |
+          set +e
+          RELEASE_ID=$(curl -sH "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases/tags/$VERSION | jq -r .id)
+          UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?name=$(basename /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api)"
+          curl -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Content-Type: application/octet-stream" --data-binary @"/home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api" "$UPLOAD_URL"
