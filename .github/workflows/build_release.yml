@@ -29,7 +29,7 @@ jobs:
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
           cmake --build . --target install
-          chmod +x ./telegram-bot-api/build/telegram-bot-api
+          chmod +x /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api
           /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api --version > /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt 2>&1
           sed -i 's/^.* /v/' /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt
 
