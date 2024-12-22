@@ -27,7 +27,7 @@ jobs:
           cd telegram-bot-api
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_CXX_FLAGS="-static" -DCMAKE_EXE_LINKER_FLAGS="-static" ..
           cmake --build . --target install
           chmod +x /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api
           /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/telegram-bot-api --version > /home/runner/work/telegram-bot-api-builds/telegram-bot-api-builds/telegram-bot-api/build/version_output.txt 2>&1
