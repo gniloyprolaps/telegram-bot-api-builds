@@ -21,11 +21,14 @@ jobs:
           sudo apt update
           sudo apt install -y gperf g++ cmake wget build-essential
 
-      - name: загрузка и установка зип-библиотеки (zlib)
+      - name: Загрузка и установка zlib
         run: |
           wget https://zlib.net/current/zlib.tar.gz
           tar -xvf zlib.tar.gz
-          cd zlib
+
+          ZLIB_DIR=$(tar -tf zlib.tar.gz | head -1 | cut -f1 -d"/")
+          echo "загружена директория zlib: $ZLIB_DIR"
+          cd $ZLIB_DIR
           ./configure --static --disable-shared --pkg-config-flags="--static"
           make
           sudo make install
