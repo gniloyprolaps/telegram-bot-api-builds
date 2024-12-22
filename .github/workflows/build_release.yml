@@ -40,7 +40,7 @@ jobs:
           echo "загрузка OpenSSL версии $OPENSSL_VERSION"
           wget https://github.com/openssl/openssl/releases/download/$OPENSSL_VERSION/${OPENSSL_VERSION#v}.tar.gz
           tar -xvf ${OPENSSL_VERSION#v}.tar.gz
-          cd openssl-${OPENSSL_VERSION#v}
+          cd ${OPENSSL_VERSION#v}
           ./config no-shared --prefix=/usr/local/openssl
           make
           sudo make install
